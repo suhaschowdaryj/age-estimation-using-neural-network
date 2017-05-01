@@ -23,10 +23,10 @@ import os
 
 
 #Picpath.txt consists of the path to the face images which is extracted from matlab code provided(sample: 17/10000217_1981-05-05_2009.jpg)
-
+#The extracted data(picpaths.txt) from the matlab has been included in the zip file 
 
 x1=np.genfromtxt('C:/data/project/picpaths.txt',dtype='str')
-x_input=x1[:2]
+x_input=x1[:16000]
 
 
 
@@ -86,8 +86,8 @@ for i in range(0,len(x_input)):
 
 #Extracting ages for the respective face images
 y1=np.genfromtxt('C:/data/project/picage.txt',delimiter=',')
-y_input=y1[:2]
-            
+y_input=y1[:16000]
+print("reached here")            
 #k=jpg_image_to_array('C:/data/project/abcd.jpg')
 agelist = np.zeros(shape=[len(y_input),100])
 
@@ -105,41 +105,50 @@ for i in range(0,len(y_input)):
 ######## Convolutional neural networks model based on VGG net architecture ##########
 
 
-
-# Parameters
-learning_rate = 0.001
-training_iters = 2
-batch_size = 5
-display_step = 1
-
-
 # Network Parameters
-n_input = 256*256*3 
-n_classes = 100 
-dropout = 0.75 # Dropout, probability to keep units
 
-#Tensorflow placeholder for inputs
-x = tf.placeholder(tf.float32, [None, n_input])
-y = tf.placeholder(tf.float32, [None, n_classes])
-keep_prob = tf.placeholder(tf.float32) #dropout (keep probability)
-#temp=tf.placeholder(tf.float32,[None,None])
+#RGB : 3 channels [256,256,3], n_classes: age labels
+# Dropout ratio
+image_size = 256*256*3 
+age_labels = 100 
+dropout = 0.75  
+n_classes=100
 
 
-# Create some wrappers for simplicity
-def conv2d(x, W, b, strides=1):
-    # Conv2D wrapper, with bias and relu activation
-    x = tf.nn.conv2d(x, W, strides=[1, strides, strides, 1], padding='SAME')
-    x = tf.nn.bias_add(x, b)
-    return tf.nn.relu(x)
+#Optimization Parameters
+no_of_iterations = 500
+input_feed_size = 30
+optimization_rate = 0.001
+check_accuracy_stepsize=15
+
+#Tensorflow placeholder for inputs x: [256x256x3], y : [100]
+x = tf.placeholder(tf.float32, [None, image_size])
+y = tf.placeholder(tf.float32, [None, age_labels])
+keep_prob = tf.placeholder(tf.float32) 
 
 
-def maxpool2d(x, k=1):
-    # MaxPool2D wrapper
-    return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1],
-                          padding='SAME')
+# Function for convolution of input and filter, adding bias term(w.X + b)
+def filter_conv(input_x, Weights, bias):
+    stride_length=1
+    #convolution w*x
+    x = tf.nn.conv2d(input_x, Weights, strides=[1, stride_length, stride_length, 1], padding='SAME')
+    #add bias term (w*x + b)
+    x = tf.nn.bias_add(x, bias)
+    return x
+
+#maxpool 
+def maxpool_layer(x):
+    stride_length=1
+    return tf.nn.max_pool(x, ksize=[1, stride_length, stride_length, 1], 
+                          strides=[1, stride_length, stride_length, 1],padding='SAME')
 
 
 # convolution neural network model
+#3 conv layers and 2 fully connected(fc) layers are used 
+#Each convolution layer is passed to relu layer and max pool layer followed by normalization
+#The resultant has been passes to next convolution layer 
+#Fc layer 1 has 1024 neurons and Fc layer 2 which is the final layer contains 100 labels.
+
 def convolutional_network(x, weights, biases, dropout):
     
     # Reshape face image : input size-256*256*3=196608, after reshape-3D[256,256,3]  
@@ -152,34 +161,34 @@ def convolutional_network(x, weights, biases, dropout):
     #maxpool1:[128x128x32]
     #lrn1:[128x128x32]
     
-    convolutional_layer1 = conv2d(x, conv1_weights, conv1_bias)
+    convolutional_layer1 = filter_conv(x, conv1_weights, conv1_bias)
     relu1 = tf.nn.relu(convolutional_layer1)
-    maxpool1 = maxpool2d(relu1, k=2)
+    maxpool1 = maxpool_layer(relu1)
     lrn1 = tf.nn.local_response_normalization(maxpool1, alpha=0.0001, beta=0.75)
     
     # Design of Convolution Layer 2
     # Input shape : [128x128x32], filter : [3x3x64,64] , bias : [64] , convolutional_layer2 : [128x128x64]
     # Relu2 : [128x128x64]
     #maxpool2:[64x64x64]
-    #lrn2:[128x128x64]
+    #lrn2:[64x64x64]
     
         
-    convolutional_layer2 = conv2d(lrn1, conv2_weights, conv2_bias)
+    convolutional_layer2 = filter_conv(lrn1, conv2_weights, conv2_bias)
     relu2 = tf.nn.relu(convolutional_layer2)
-    maxpool2 = maxpool2d(relu2, k=2)
+    maxpool2 = maxpool_layer(relu2)
     lrn2 = tf.nn.local_response_normalization(maxpool2, alpha=0.0001, beta=0.75)
     
     
     # Design of Convolution Layer 3
-    # Input shape : [64x64x64], filter : [3x3x64,128] , bias : [128] , convolutional_layer1 : [256x256x32]
-    # Relu1 : [256x256x32]
-    #maxpool1:[128x128x32]
-    #lrn1:[128x128x32]
+    # Input shape : [64x64x64], filter : [3x3x64,128] , bias : [128] , convolutional_layer3 : [64x64x128]
+    # Relu3 : [64x64x128]
+    #maxpool3:[32x32x128]
+    #lrn3:[32x32x128]
     
         
-    convolutional_layer3 = conv2d(lrn2, conv3_weights, conv3_bias)
+    convolutional_layer3 = filter_conv(lrn2, conv3_weights, conv3_bias)
     relu3 = tf.nn.relu(convolutional_layer3)
-    maxpool3 = maxpool2d(relu3, k=2)
+    maxpool3 = maxpool_layer(relu3)
     lrn3 = tf.nn.local_response_normalization(maxpool3, alpha=0.0001, beta=0.75)
     
 
@@ -189,8 +198,7 @@ def convolutional_network(x, weights, biases, dropout):
     fc1_input = tf.reshape(lrn3, [-1, fc1_weights.get_shape().as_list()[0]])
     fc1 = tf.add(tf.matmul(fc1_input, fc1_weights), fc1_bias)
     fc1_relu = tf.nn.relu(fc1)
-    
-    #Dropout
+    #Dropout ratio =.75
     fc1_dropout = tf.nn.dropout(fc1_relu, dropout)
 
     # Output, Fully connected layer 2 (FC2): 1024 neurons will be connected to output 100 labels in fully connected layer 2
@@ -200,14 +208,19 @@ def convolutional_network(x, weights, biases, dropout):
 
 #weights
 
-# 5x5 conv, 1 input, 32 outputs
+# Convolutional layer 1 weights : 5x5x3, 32 filters
 conv1_weights = tf.Variable(tf.random_normal([5,5,3,32]),name="conv1_weights") 
-# 5x5 conv, 32 inputs, 64 outputs
+
+# Convolutional layer 2 weights : 3x3x3, 64 filters
 conv2_weights = tf.Variable(tf.random_normal([3,3,32,64]),name="conv2_weights")
+
+# Convolutional layer 3 weights : 3x3x3, 128 filters
 conv3_weights = tf.Variable(tf.random_normal([3,3,64,128]),name="conv3_weights")
-# fully connected, 7*7*64 inputs, 1024 outputs
+
+# Fully connected layer 1 weights : 32*32*128, 1024 neurons
 fc1_weights = tf.Variable(tf.random_normal([32*32*128,1024]),name="fc1_weights") 
-# 1024 inputs, 10 outputs (class prediction)
+
+# Fully connected layer 2 weights : 1024, output= 100 classes
 fc2_weights = tf.Variable(tf.random_normal([1024,n_classes]),name="fc2_weights") 
 
 
@@ -225,15 +238,12 @@ predicted_age = convolutional_network(x, conv1_weights, conv1_bias, keep_prob)
 
 # Optimization 
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=predicted_age, labels=y))
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+optimizer = tf.train.AdamOptimizer(learning_rate=optimization_rate).minimize(cost)
 
 # Evaluation
 correct_pred = tf.equal(tf.argmax(predicted_age, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
-
-batch_x=list_of_3D_RGB_pixel_images
-batch_y=agelist
 
 # Tensorflow variable initialization
 init = tf.global_variables_initializer()
@@ -241,16 +251,22 @@ init = tf.global_variables_initializer()
 # Graph initialization
 with tf.Session() as sess:
     sess.run(init)
-    step = 1   
+    step_size = 1   
     
-    # Optimization using Adam optimizer
-    while step * batch_size < training_iters:
+    # Optimization using Adam optimizer(with gradient descent method)
+    while step_size * input_feed_size < no_of_iterations:
+        batch_x=list_of_3D_RGB_pixel_images[(input_feed_size*(step_size-1)):(input_feed_size*(step_size))]
+        batch_y=agelist[(input_feed_size*(step_size-1)):(input_feed_size*(step_size))]
         
         # Run optimization op (backprop)
         a1,b1=sess.run([optimizer,cost], feed_dict={x: batch_x, y: batch_y,keep_prob: dropout})  
-        if step % display_step == 0:
-        # Calculate batch loss and accuracy
-        loss, acc = sess.run([cost, accuracy], feed_dict={x: batch_x, y: batch_y,keep_prob: 1.})
-        step += 1
+        if step % check_accuracy_stepsize == 0:
+            # Calculate batch loss and accuracy
+            loss, acc = sess.run([cost, accuracy], feed_dict={x: batch_x, y: batch_y,keep_prob: 1.})
+            print (" cost and accuracy at iteration %s is %s, %s" %(step,loss,acc))  
+        step_size += 1
  
+    #accuracy for 1000 images
+    print ("Accuracy:", sess.run(accuracy, feed_dict={x: list_of_3D_RGB_pixel_images[15000:16000],y: agelist[15000:16000],keep_prob: 1.}))
 
+print("kkk")

@@ -114,12 +114,11 @@ display_step = 1
 
 
 # Network Parameters
-n_input = 256*256*3 # MNIST data input (img shape: 28*28)
-print(n_input)
-n_classes = 100 # MNIST total classes (0-9 digits)
+n_input = 256*256*3 
+n_classes = 100 
 dropout = 0.75 # Dropout, probability to keep units
 
-# tf Graph input
+#Tensorflow placeholder for inputs
 x = tf.placeholder(tf.float32, [None, n_input])
 y = tf.placeholder(tf.float32, [None, n_classes])
 keep_prob = tf.placeholder(tf.float32) #dropout (keep probability)
@@ -131,13 +130,11 @@ def conv2d(x, W, b, strides=1):
     # Conv2D wrapper, with bias and relu activation
     x = tf.nn.conv2d(x, W, strides=[1, strides, strides, 1], padding='SAME')
     x = tf.nn.bias_add(x, b)
-    print("x shape is",x.shape)
     return tf.nn.relu(x)
 
 
 def maxpool2d(x, k=1):
     # MaxPool2D wrapper
-    print("reached maxpool")
     return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1],
                           padding='SAME')
 
@@ -147,7 +144,6 @@ def convolutional_network(x, weights, biases, dropout):
     
     # Reshape face image : input size-256*256*3=196608, after reshape-3D[256,256,3]  
     x = tf.reshape(x, shape=[-1, 256, 256, 3])
-    print("reached convv")
     
     
     # Design of Convolution Layer 1
@@ -224,15 +220,15 @@ fc1_bias= tf.Variable(tf.random_normal([1024]))
 fc2_bias= tf.Variable(tf.random_normal([n_classes]))
 
 
-# Construct model
-pred = convolutional_network(x, conv1_weights, conv1_bias, keep_prob)
+# Feed input to the CNN model 
+predicted_age = convolutional_network(x, conv1_weights, conv1_bias, keep_prob)
 
-# Define loss and optimizer
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
+# Optimization 
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=predicted_age, labels=y))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
 
-# Evaluate model
-correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
+# Evaluation
+correct_pred = tf.equal(tf.argmax(predicted_age, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 
@@ -242,44 +238,19 @@ batch_y=agelist
 # Tensorflow variable initialization
 init = tf.global_variables_initializer()
 
-# Launch the graph
+# Graph initialization
 with tf.Session() as sess:
     sess.run(init)
-    step = 1
-    # Keep training until reach max iterations
-   
-    while step  < 2:
-        a1,b1=sess.run([optimizer,cost], feed_dict={x: batch_x, y: batch_y,keep_prob: dropout})
-        
-        print("Asffasf",b1)
-        step += 1
-    print ("Optimization Finished!")
-
-
+    step = 1   
     
-    
-with tf.Session() as sess:
-    sess.run(init)
-    step = 1
-    # Keep training until reach max iterations
+    # Optimization using Adam optimizer
     while step * batch_size < training_iters:
+        
         # Run optimization op (backprop)
-        sess.run(optimizer, feed_dict={x: batch_x, y: batch_y,
-                                       keep_prob: dropout})
+        a1,b1=sess.run([optimizer,cost], feed_dict={x: batch_x, y: batch_y,keep_prob: dropout})  
         if step % display_step == 0:
-            # Calculate batch loss and accuracy
-            loss, acc = sess.run([cost, accuracy], feed_dict={x: batch_x,
-                                                              y: batch_y,
-                                                              keep_prob: 1.})
-            print("Iter " + str(step*batch_size) + ", Minibatch Loss= " + \
-                  "{:.6f}".format(loss) + ", Training Accuracy= " + \
-                  "{:.5f}".format(acc))
+        # Calculate batch loss and accuracy
+        loss, acc = sess.run([cost, accuracy], feed_dict={x: batch_x, y: batch_y,keep_prob: 1.})
         step += 1
-    print("Optimization Finished!")
-
-    # Calculate accuracy for 256 mnist test images
-    print("Testing Accuracy:", \
-        sess.run(accuracy, feed_dict={x: mnist.test.images[:256],
-                                      y: mnist.test.labels[:256],
-                                      keep_prob: 1.}))
+ 
 

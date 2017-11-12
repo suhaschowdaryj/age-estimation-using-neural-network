@@ -269,4 +269,4 @@ with tf.Session() as sess:
     #accuracy for 1000 images
     print ("Accuracy:", sess.run(accuracy, feed_dict={x: list_of_3D_RGB_pixel_images[15000:16000],y: agelist[15000:16000],keep_prob: 1.}))
 
-print("kkk")
+print("end")
